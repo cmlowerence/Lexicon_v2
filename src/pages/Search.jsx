@@ -1,9 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import SearchBar from '../components/SearchBar';
 import WordCard from '../components/WordCard';
 import { WordCardSkeleton } from '../components/Skeletons';
 import { publicApi } from '../api/publicApi';
 import useDebounce from '../hooks/useDebounce';
+
+const MIN_QUERY_LENGTH = 2;
+const CACHE_TTL_MS = 30000;
+const LANGUAGE = 'en';
 
 export default function Search() {
   const [query, setQuery] = useState('');
@@ -12,24 +16,70 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
+  const abortControllerRef = useRef(null);
+  const latestRequestIdRef = useRef(0);
+  const cacheRef = useRef(new Map());
+
   const debouncedQuery = useDebounce(query, 400);
 
   const performSearch = useCallback(async (searchWord, semanticFlag) => {
-    if (!searchWord.trim()) {
+    const normalizedQuery = searchWord.trim();
+
+    if (normalizedQuery.length < MIN_QUERY_LENGTH) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
       setResults([]);
       setSearched(false);
+      setLoading(false);
       return;
     }
+
+    const cacheKey = `${normalizedQuery.toLowerCase()}|${semanticFlag}|${LANGUAGE}`;
+    const cached = cacheRef.current.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      setResults(cached.data);
+      setSearched(true);
+      setLoading(false);
+      return;
+    }
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    const requestController = new AbortController();
+    abortControllerRef.current = requestController;
+    const requestId = latestRequestIdRef.current + 1;
+    latestRequestIdRef.current = requestId;
 
     setLoading(true);
     setSearched(true);
     try {
-      const data = await publicApi.searchWord(searchWord, semanticFlag, 'en');
-      setResults(Array.isArray(data) ? data : (data.results || [data]));
+      const data = await publicApi.searchWord(normalizedQuery, semanticFlag, LANGUAGE, {
+        signal: requestController.signal,
+      });
+
+      if (requestId !== latestRequestIdRef.current) return;
+
+      const normalizedResults = Array.isArray(data) ? data : (data.results || [data]);
+      cacheRef.current.set(cacheKey, {
+        data: normalizedResults,
+        timestamp: Date.now(),
+      });
+      setResults(normalizedResults);
     } catch (error) {
+      if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') {
+        return;
+      }
+
+      if (requestId !== latestRequestIdRef.current) return;
+
       console.error('Search failed', error);
       setResults([]);
     } finally {
+      if (requestId !== latestRequestIdRef.current) return;
       setLoading(false);
     }
   }, []);
@@ -37,6 +87,12 @@ export default function Search() {
   useEffect(() => {
     performSearch(debouncedQuery, isSemantic);
   }, [debouncedQuery, isSemantic, performSearch]);
+
+  useEffect(() => () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  }, []);
 
   return (
     <div className="max-w-4xl mx-auto py-8">
