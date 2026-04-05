@@ -33,8 +33,49 @@ const handleAuthFailure = ({ forceLogout, showToast }) => {
   showToast('Session expired. Please log in again.');
 };
 
+const isDev = import.meta.env.DEV;
+const isProd = import.meta.env.PROD;
+const SLOW_REQUEST_THRESHOLD_MS = 1500;
+
+const generateRequestId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `req_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+};
+
+const getNow = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+const reportErrorToMonitoring = ({ requestId, method, endpoint, errorType, status, durationMs, error }) => {
+  if (!isProd) return;
+
+  if (typeof window !== 'undefined' && typeof window.__MONITORING_CAPTURE__ === 'function') {
+    window.__MONITORING_CAPTURE__('api_error', {
+      requestId,
+      method,
+      endpoint,
+      errorType,
+      status,
+      durationMs,
+      code: error.code,
+      message: error.message,
+    });
+  }
+};
+
+const applyRequestTracking = (config) => {
+  const requestId = generateRequestId();
+  const startTime = getNow();
+  config.headers = config.headers || {};
+  config.headers['X-Request-ID'] = requestId;
+  config.metadata = { ...(config.metadata || {}), requestId, startTime };
+  return config;
+};
+
 apiClient.interceptors.request.use(
   (config) => {
+    applyRequestTracking(config);
     const accessToken = useAuthStore.getState().accessToken;
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
@@ -46,12 +87,13 @@ apiClient.interceptors.request.use(
 
 let isRefreshing = false;
 let failedQueue = [];
-const isDev = import.meta.env.DEV;
 
 const getRequestMetadata = (error) => {
   const method = error.config?.method?.toUpperCase() || 'UNKNOWN';
   const endpoint = error.config?.url || 'unknown endpoint';
-  return { method, endpoint };
+  const requestId = error.config?.metadata?.requestId || 'unknown-request-id';
+  const durationMs = Math.round(getNow() - (error.config?.metadata?.startTime || getNow()));
+  return { method, endpoint, requestId, durationMs };
 };
 
 const classifyError = (error) => {
@@ -95,13 +137,29 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
+authClient.interceptors.request.use(
+  (config) => applyRequestTracking(config),
+  (error) => Promise.reject(error)
+);
+
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const method = response.config?.method?.toUpperCase() || 'UNKNOWN';
+    const endpoint = response.config?.url || 'unknown endpoint';
+    const requestId = response.config?.metadata?.requestId || 'unknown-request-id';
+    const durationMs = Math.round(getNow() - (response.config?.metadata?.startTime || getNow()));
+
+    if (isDev && durationMs >= SLOW_REQUEST_THRESHOLD_MS) {
+      console.debug(`[apiClient] slow request ${method} ${endpoint} (${durationMs}ms)`, { requestId });
+    }
+
+    return response;
+  },
   async (error) => {
     const status = error.response?.status;
     const originalRequest = error.config;
     const { showToast } = useUIStore.getState();
-    const { method, endpoint } = getRequestMetadata(error);
+    const { method, endpoint, requestId, durationMs } = getRequestMetadata(error);
 
     if (status === 401 && !originalRequest._retry) {
       const { refreshToken, forceLogout, setAccessToken, setRefreshToken } = useAuthStore.getState();
@@ -156,14 +214,26 @@ apiClient.interceptors.response.use(
     const classifiedError = classifyError(error);
 
     if (isDev) {
-      console.debug(`[apiClient] ${method} ${endpoint} failed (${classifiedError.type})`, {
+      console.debug(`[apiClient] [${requestId}] ${method} ${endpoint} failed (${classifiedError.type})`, {
         status,
+        durationMs,
         code: error.code,
         message: error.message,
       });
     }
 
-    showToast(classifiedError.message);
+    reportErrorToMonitoring({
+      requestId,
+      method,
+      endpoint,
+      errorType: classifiedError.type,
+      status,
+      durationMs,
+      error,
+    });
+
+    error.requestId = requestId;
+    showToast(`${classifiedError.message} (Request ID: ${requestId})`);
 
     return Promise.reject(error);
   }
