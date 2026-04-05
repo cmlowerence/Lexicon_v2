@@ -4,15 +4,25 @@ import { persist } from 'zustand/middleware';
 export const useAuthStore = create(
   persist(
     (set) => ({
-      token: null,
+      accessToken: null,
+      refreshToken: null,
       isAuthenticated: false,
-      
-      // Actions
-      login: (token) => set({ token, isAuthenticated: true }),
-      logout: () => set({ token: null, isAuthenticated: false }),
+
+      login: ({ access, refresh }) => set({
+        accessToken: access,
+        refreshToken: refresh,
+        isAuthenticated: Boolean(access),
+      }),
+
+      setAccessToken: (accessToken) => set((state) => ({
+        accessToken,
+        isAuthenticated: Boolean(accessToken || state.refreshToken),
+      })),
+
+      logout: () => set({ accessToken: null, refreshToken: null, isAuthenticated: false }),
     }),
     {
-      name: 'lexicon-auth-storage', // key in localStorage
+      name: 'lexicon-auth-storage',
     }
   )
 );

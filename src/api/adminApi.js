@@ -1,52 +1,41 @@
 import { apiClient } from './client';
+import { transformWord, transformWordList } from './transformers/wordTransformer';
 
 export const adminApi = {
-  // ==========================================
-  // WORD MANAGEMENT
-  // ==========================================
-  
-  getWordsList: async () => {
-    const response = await apiClient.get('/manager/words/list/');
-    return response.data;
+  getWordsList: async (filters = {}) => {
+    const response = await apiClient.get('/manager/words/list/', { params: filters });
+    return transformWordList(response.data || []);
   },
 
   createWord: async (data) => {
     const response = await apiClient.post('/manager/words/', data);
-    return response.data;
+    return transformWord(response.data);
   },
 
   getWordDetail: async (id) => {
     const response = await apiClient.get(`/manager/words/${id}/`);
-    return response.data;
+    return transformWord(response.data);
   },
 
   updateWord: async (id, data) => {
     const response = await apiClient.patch(`/manager/words/${id}/`, data);
-    return response.data;
+    return transformWord(response.data);
   },
 
   deleteWord: async (id) => {
-    const response = await apiClient.delete(`/manager/words/${id}/`);
-    return response.data;
+    await apiClient.delete(`/manager/words/${id}/`);
+    return true;
   },
-
-  // ==========================================
-  // ENTITY MANAGEMENT (Meanings, Pronunciations, etc.)
-  // ==========================================
 
   addEntity: async (wordId, entityType, data) => {
     const response = await apiClient.post(`/manager/words/${wordId}/add-${entityType}/`, data);
-    return response.data;
+    return transformWord(response.data);
   },
 
   removeEntity: async (wordId, entityType, entityId) => {
     const response = await apiClient.delete(`/manager/words/${wordId}/remove-${entityType}/${entityId}/`);
-    return response.data;
+    return transformWord(response.data);
   },
-
-  // ==========================================
-  // CATEGORY MANAGEMENT
-  // ==========================================
 
   getCategories: async () => {
     const response = await apiClient.get('/manager/categories/');
@@ -70,12 +59,13 @@ export const adminApi = {
 
   assignCategory: async (wordId, categoryId) => {
     const response = await apiClient.post(`/manager/words/${wordId}/categories/${categoryId}/`);
-    return response.data;
+    return transformWord(response.data);
   },
 
-  // ==========================================
-  // OVERRIDES (WOTD & Practice)
-  // ==========================================
+  removeCategory: async (wordId, categoryId) => {
+    const response = await apiClient.delete(`/manager/words/${wordId}/categories/${categoryId}/`);
+    return transformWord(response.data);
+  },
 
   overrideWOTD: async (data) => {
     const response = await apiClient.post('/manager/word-of-the-day/override/', data);
@@ -85,5 +75,5 @@ export const adminApi = {
   overridePractice: async (data) => {
     const response = await apiClient.post('/manager/daily-practice/override/', data);
     return response.data;
-  }
+  },
 };

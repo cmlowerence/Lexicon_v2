@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { publicApi } from '../api/publicApi';
 import WordCard from '../components/WordCard';
-import { Activity, BookOpen } from 'lucide-react';
+import { Activity, BookOpen, Sparkles } from 'lucide-react';
 
 export default function Home() {
   const [wotd, setWotd] = useState(null);
@@ -13,12 +13,13 @@ export default function Home() {
       try {
         const [wotdRes, trendingRes] = await Promise.all([
           publicApi.getWOTD(),
-          publicApi.getTrending()
+          publicApi.getTrending(),
         ]);
-        setWotd(wotdRes);
-        setTrending(trendingRes);
+
+        setWotd(wotdRes?.word ? wotdRes : { word: wotdRes, date: null });
+        setTrending(trendingRes || []);
       } catch (error) {
-        console.error("Failed to load dashboard info");
+        console.error('Failed to load dashboard info', error);
       } finally {
         setLoading(false);
       }
@@ -30,20 +31,26 @@ export default function Home() {
 
   return (
     <div className="space-y-12 animate-fade-in">
-      {/* Word of the Day Section */}
-      <section>
+      <section className="bg-gradient-to-r from-brand-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 rounded-2xl border border-brand-100 dark:border-slate-700 p-6 md:p-8 shadow-sm">
         <div className="flex items-center gap-2 mb-6">
           <BookOpen className="text-brand-600" size={24} />
-          <h2 className="text-2xl font-bold text-gray-800">Word of the Day</h2>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Word of the Day</h2>
+          <Sparkles className="text-amber-500" size={20} />
         </div>
-        {wotd ? <WordCard wordData={wotd} /> : <p className="text-gray-500">No Word of the Day available.</p>}
+
+        {wotd?.date && (
+          <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-4">
+            {wotd.date}
+          </p>
+        )}
+
+        {wotd?.word ? <WordCard wordData={wotd.word} /> : <p className="text-gray-500">No Word of the Day available.</p>}
       </section>
 
-      {/* Trending Words Section */}
       <section>
         <div className="flex items-center gap-2 mb-6">
           <Activity className="text-brand-600" size={24} />
-          <h2 className="text-2xl font-bold text-gray-800">Trending Words</h2>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Trending Words</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {trending.map((word) => (

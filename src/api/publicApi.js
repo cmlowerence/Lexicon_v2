@@ -1,39 +1,36 @@
 import { apiClient } from './client';
+import { transformDailyPractice, transformWOTD, transformWord, transformWordList } from './transformers/wordTransformer';
 
 export const publicApi = {
-  /**
-   * Search for a word (Normal or Semantic)
-   * @param {string} word - The search query
-   * @param {boolean} semantic - Toggle semantic search
-   */
-  searchWord: async (word, semantic = false) => {
+  searchWord: async (word, semantic = false, lang = 'en') => {
     const response = await apiClient.get('/public/search/', {
-      params: { word, semantic }
+      params: {
+        word,
+        lang,
+        semantic: semantic ? 'true' : 'false',
+      },
     });
-    return response.data;
+
+    const payload = response.data;
+
+    if (Array.isArray(payload)) return transformWordList(payload);
+    if (payload?.results) return { ...payload, results: transformWordList(payload.results) };
+
+    return transformWord(payload);
   },
 
-  /**
-   * Get the current Word of the Day
-   */
   getWOTD: async () => {
     const response = await apiClient.get('/public/word-of-the-day/');
-    return response.data;
+    return transformWOTD(response.data);
   },
 
-  /**
-   * Get the daily practice set
-   */
   getDailyPractice: async () => {
     const response = await apiClient.get('/public/daily-practice/');
-    return response.data;
+    return transformDailyPractice(response.data);
   },
 
-  /**
-   * Get trending words
-   */
   getTrending: async () => {
     const response = await apiClient.get('/public/trending/');
-    return response.data;
-  }
+    return transformWordList(response.data || []);
+  },
 };
