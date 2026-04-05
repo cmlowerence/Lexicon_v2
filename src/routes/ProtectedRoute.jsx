@@ -8,7 +8,8 @@ export default function ProtectedRoute() {
   const location = useLocation();
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+    const from = `${location.pathname}${location.search}${location.hash}`;
+    return <Navigate to="/login" state={{ from }} replace />;
   }
 
   return <Outlet />;
@@ -29,7 +30,8 @@ export function AdminRoute() {
   }, [isAuthenticated, isAdmin, showToast]);
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+    const from = `${location.pathname}${location.search}${location.hash}`;
+    return <Navigate to="/login" state={{ from }} replace />;
   }
 
   if (!isAdmin) {
