@@ -22,8 +22,8 @@ export default function Login() {
       const response = await authClient.post(TOKEN_ENDPOINT, { username, password });
 
       login({
-        access: response.data.access,
-        refresh: response.data.refresh,
+        access: response.data?.access ?? null,
+        refresh: response.data?.refresh ?? null,
       });
 
       navigate('/admin');

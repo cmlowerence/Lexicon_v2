@@ -1,5 +1,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { AUTH_USE_COOKIE_REFRESH } from '../config/api';
+
+const STORAGE_KEY = 'lexicon-auth-storage';
+
+const initialState = {
+  accessToken: null,
+  refreshToken: null,
+  hasRefreshSession: false,
+  isAuthenticated: false,
+};
 
 const ADMIN_ROLES = new Set(['admin', 'administrator', 'superadmin', 'staff']);
 
@@ -51,49 +61,54 @@ const extractUserClaims = ({ accessToken, profile, claims }) => {
 export const useAuthStore = create(
   persist(
     (set) => ({
-      accessToken: null,
-      refreshToken: null,
-      isAuthenticated: false,
-      role: null,
-      isStaff: false,
-      isSuperuser: false,
-      isAdmin: false,
-      claims: null,
+      ...initialState,
 
-      login: ({ access, refresh, profile, claims }) => {
-        const userClaims = extractUserClaims({ accessToken: access, profile, claims });
+      login: ({ access, refresh }) => {
+        const normalizedRefreshToken = refresh ?? null;
+        const hasRefreshSession = AUTH_USE_COOKIE_REFRESH || Boolean(normalizedRefreshToken);
 
         set({
-          accessToken: access,
-          refreshToken: refresh,
-          isAuthenticated: Boolean(access),
-          ...userClaims,
+          accessToken: access ?? null,
+          refreshToken: normalizedRefreshToken,
+          hasRefreshSession,
+          isAuthenticated: Boolean(access) || hasRefreshSession,
         });
       },
 
-      setAccessToken: (accessToken, profile, claims) => set((state) => {
-        const userClaims = extractUserClaims({ accessToken, profile, claims: claims || state.claims });
+      setAccessToken: (accessToken) =>
+        set((state) => ({
+          accessToken: accessToken ?? null,
+          isAuthenticated: Boolean(accessToken) || state.hasRefreshSession,
+        })),
 
-        return {
-          accessToken,
-          isAuthenticated: Boolean(accessToken || state.refreshToken),
-          ...userClaims,
-        };
-      }),
+      setRefreshToken: (refreshToken) =>
+        set((state) => {
+          const normalizedRefreshToken = refreshToken ?? null;
+          const hasRefreshSession = AUTH_USE_COOKIE_REFRESH || Boolean(normalizedRefreshToken);
 
-      logout: () => set({
-        accessToken: null,
-        refreshToken: null,
-        isAuthenticated: false,
-        role: null,
-        isStaff: false,
-        isSuperuser: false,
-        isAdmin: false,
-        claims: null,
-      }),
+          return {
+            refreshToken: normalizedRefreshToken,
+            hasRefreshSession,
+            isAuthenticated: Boolean(state.accessToken) || hasRefreshSession,
+          };
+        }),
+
+      forceLogout: () => {
+        set({ ...initialState });
+        useAuthStore.persist.clearStorage();
+      },
+
+      logout: () => {
+        set({ ...initialState });
+        useAuthStore.persist.clearStorage();
+      },
     }),
     {
-      name: 'lexicon-auth-storage',
+      name: STORAGE_KEY,
+      partialize: (state) => ({
+        refreshToken: AUTH_USE_COOKIE_REFRESH ? null : state.refreshToken,
+        hasRefreshSession: state.hasRefreshSession,
+      }),
     }
   )
 );
