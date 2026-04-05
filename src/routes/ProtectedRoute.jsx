@@ -4,8 +4,13 @@ import { useAuthStore } from '../store/authStore';
 import { useUIStore } from '../store/uiStore';
 
 export default function ProtectedRoute() {
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const location = useLocation();
+
+  if (!hasHydrated) {
+    return null;
+  }
 
   if (!isAuthenticated) {
     const from = `${location.pathname}${location.search}${location.hash}`;
@@ -16,6 +21,7 @@ export default function ProtectedRoute() {
 }
 
 export function AdminRoute() {
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isAdmin = useAuthStore((state) => state.isAdmin);
   const showToast = useUIStore((state) => state.showToast);
@@ -28,6 +34,10 @@ export function AdminRoute() {
       hasWarnedRef.current = true;
     }
   }, [isAuthenticated, isAdmin, showToast]);
+
+  if (!hasHydrated) {
+    return null;
+  }
 
   if (!isAuthenticated) {
     const from = `${location.pathname}${location.search}${location.hash}`;

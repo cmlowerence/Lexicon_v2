@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AUTH_USE_COOKIE_REFRESH } from '../config/api';
+import { AUTH_USE_COOKIE_REFRESH, TOKEN_REFRESH_ENDPOINT } from '../config/api';
 
 const STORAGE_KEY = 'lexicon-auth-storage';
 
@@ -14,6 +14,7 @@ const initialState = {
   isSuperuser: false,
   claims: {},
   isAdmin: false,
+  hasHydrated: false,
 };
 
 const ADMIN_ROLES = new Set(['admin', 'administrator', 'superadmin', 'staff']);
@@ -34,6 +35,8 @@ const parseJwtPayload = (token) => {
 };
 
 const normalizeRole = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : null);
+const deriveIsAuthenticated = ({ accessToken, hasRefreshSession }) =>
+  Boolean(accessToken) || Boolean(hasRefreshSession);
 
 const extractUserClaims = ({ accessToken, profile, claims }) => {
   const jwtClaims = parseJwtPayload(accessToken);
@@ -65,7 +68,7 @@ const extractUserClaims = ({ accessToken, profile, claims }) => {
 
 export const useAuthStore = create(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...initialState,
 
       login: ({ access, refresh }) => {
@@ -77,7 +80,7 @@ export const useAuthStore = create(
           accessToken: access ?? null,
           refreshToken: normalizedRefreshToken,
           hasRefreshSession,
-          isAuthenticated: Boolean(access) || hasRefreshSession,
+          isAuthenticated: deriveIsAuthenticated({ accessToken: access, hasRefreshSession }),
           ...authClaims,
         });
       },
@@ -89,7 +92,10 @@ export const useAuthStore = create(
 
           return {
             accessToken: normalizedAccessToken,
-            isAuthenticated: Boolean(normalizedAccessToken) || state.hasRefreshSession,
+            isAuthenticated: deriveIsAuthenticated({
+              accessToken: normalizedAccessToken,
+              hasRefreshSession: state.hasRefreshSession,
+            }),
             ...authClaims,
           };
         }),
@@ -102,9 +108,63 @@ export const useAuthStore = create(
           return {
             refreshToken: normalizedRefreshToken,
             hasRefreshSession,
-            isAuthenticated: Boolean(state.accessToken) || hasRefreshSession,
+            isAuthenticated: deriveIsAuthenticated({
+              accessToken: state.accessToken,
+              hasRefreshSession,
+            }),
           };
         }),
+
+      bootstrapSession: async () => {
+        const state = get();
+        const hasRefreshSession = AUTH_USE_COOKIE_REFRESH || Boolean(state.refreshToken);
+
+        if (!hasRefreshSession) {
+          return false;
+        }
+
+        if (state.accessToken) {
+          return true;
+        }
+
+        if (!AUTH_USE_COOKIE_REFRESH && !state.refreshToken) {
+          return false;
+        }
+
+        try {
+          const response = await fetch(TOKEN_REFRESH_ENDPOINT, {
+            method: 'POST',
+            credentials: AUTH_USE_COOKIE_REFRESH ? 'include' : 'same-origin',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify(AUTH_USE_COOKIE_REFRESH ? {} : { refresh: state.refreshToken }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Token refresh failed with status ${response.status}`);
+          }
+
+          const data = await response.json();
+          const newAccessToken = data?.access ?? null;
+
+          if (!newAccessToken) {
+            throw new Error('Token refresh did not return an access token.');
+          }
+
+          state.setAccessToken(newAccessToken);
+
+          if (!AUTH_USE_COOKIE_REFRESH) {
+            state.setRefreshToken(data?.refresh ?? state.refreshToken ?? null);
+          }
+
+          return true;
+        } catch {
+          state.forceLogout();
+          return false;
+        }
+      },
 
       forceLogout: () => {
         set({ ...initialState });
@@ -122,6 +182,33 @@ export const useAuthStore = create(
         refreshToken: AUTH_USE_COOKIE_REFRESH ? null : state.refreshToken,
         hasRefreshSession: state.hasRefreshSession,
       }),
+      onRehydrateStorage: () => (state, error) => {
+        if (!state) {
+          return;
+        }
+
+        if (error) {
+          state.forceLogout();
+          useAuthStore.setState({ hasHydrated: true });
+          return;
+        }
+
+        const hasRefreshSession = AUTH_USE_COOKIE_REFRESH || Boolean(state.refreshToken);
+        const isAuthenticated = deriveIsAuthenticated({
+          accessToken: state.accessToken,
+          hasRefreshSession,
+        });
+
+        useAuthStore.setState({
+          hasRefreshSession,
+          isAuthenticated,
+          hasHydrated: true,
+        });
+
+        if (isAuthenticated && !state.accessToken) {
+          void state.bootstrapSession();
+        }
+      },
     }
   )
 );
