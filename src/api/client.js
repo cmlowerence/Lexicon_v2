@@ -46,6 +46,46 @@ apiClient.interceptors.request.use(
 
 let isRefreshing = false;
 let failedQueue = [];
+const isDev = import.meta.env.DEV;
+
+const getRequestMetadata = (error) => {
+  const method = error.config?.method?.toUpperCase() || 'UNKNOWN';
+  const endpoint = error.config?.url || 'unknown endpoint';
+  return { method, endpoint };
+};
+
+const classifyError = (error) => {
+  const status = error.response?.status;
+
+  if (error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout')) {
+    return { type: 'timeout', message: 'Request timed out. Please try again.' };
+  }
+
+  if (status === 401) {
+    return { type: 'unauthorized', message: 'Session expired. Please log in again.' };
+  }
+
+  if (status === 403) {
+    return { type: 'forbidden', message: 'Permission denied.' };
+  }
+
+  if (status === 404) {
+    return { type: 'not_found', message: 'Requested resource was not found.' };
+  }
+
+  if (status >= 500) {
+    return { type: 'server', message: 'Server unavailable. Please try again later.' };
+  }
+
+  if (!error.response) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      return { type: 'offline', message: 'You appear to be offline. Please check your internet connection.' };
+    }
+    return { type: 'cors', message: 'Connection blocked by browser security (CORS/preflight). Please contact support.' };
+  }
+
+  return { type: 'unknown', message: 'Something went wrong. Please try again.' };
+};
 
 const processQueue = (error, token = null) => {
   failedQueue.forEach((prom) => {
@@ -61,6 +101,7 @@ apiClient.interceptors.response.use(
     const status = error.response?.status;
     const originalRequest = error.config;
     const { showToast } = useUIStore.getState();
+    const { method, endpoint } = getRequestMetadata(error);
 
     if (status === 401 && !originalRequest._retry) {
       const { refreshToken, forceLogout, setAccessToken, setRefreshToken } = useAuthStore.getState();
@@ -112,11 +153,17 @@ apiClient.interceptors.response.use(
       }
     }
 
-    if (status >= 500) {
-      showToast('Server error. Please try again later.');
-    } else if (!error.response) {
-      showToast('Network error. Please check your connection.');
+    const classifiedError = classifyError(error);
+
+    if (isDev) {
+      console.debug(`[apiClient] ${method} ${endpoint} failed (${classifiedError.type})`, {
+        status,
+        code: error.code,
+        message: error.message,
+      });
     }
+
+    showToast(classifiedError.message);
 
     return Promise.reject(error);
   }
