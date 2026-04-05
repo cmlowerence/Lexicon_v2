@@ -23,13 +23,33 @@ export const apiClient = axios.create({
   timeout: 10000,
 });
 
-const redirectToLogin = () => {
-  window.location.href = '/login';
+const AUTH_EXPIRED_EVENT = 'lexicon:auth-expired';
+
+const getCurrentPath = () => {
+  if (typeof window === 'undefined') {
+    return '/';
+  }
+
+  const { pathname, search, hash } = window.location;
+  return `${pathname}${search}${hash}`;
 };
 
 const handleAuthFailure = ({ forceLogout, showToast }) => {
+  const from = getCurrentPath();
   forceLogout();
-  redirectToLogin();
+  const { markAuthExpired } = useAuthStore.getState();
+  markAuthExpired(from);
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT, { detail: { from } }));
+    window.setTimeout(() => {
+      if (!window.location.pathname.startsWith('/login')) {
+        const encodedFrom = encodeURIComponent(from);
+        window.location.href = `/login?from=${encodedFrom}`;
+      }
+    }, 0);
+  }
+
   showToast('Session expired. Please log in again.');
 };
 
