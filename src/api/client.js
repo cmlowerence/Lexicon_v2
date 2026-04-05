@@ -1,6 +1,7 @@
 import axios from 'axios';
+import { useAuthStore } from '../store/authStore';
 
-const BASE_URL = 'https://qubitgyan-api/api/v2/lexicon';
+const BASE_URL = 'http://127.0.0.1:8000/api/v2/lexicon';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -8,27 +9,31 @@ export const apiClient = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  // 10 second timeout to prevent hanging requests
-  timeout: 10000, 
+  timeout: 10000,
 });
 
-// Interceptor stub: Auth tokens will be injected here in Stage 3
+// Inject Token into requests
 apiClient.interceptors.request.use(
   (config) => {
-    // TODO: Retrieve token from Zustand store in Stage 3
-    // const token = useAuthStore.getState().token;
-    // if (token) config.headers.Authorization = `Bearer ${token}`;
+    // Access Zustand store directly outside of React components
+    const token = useAuthStore.getState().token;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Interceptor stub: Global error handling (Stage 7)
+// Global Error Handling (Catch 401 Unauthorized)
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    // TODO: Handle 401s, 403s, and network errors globally
-    console.error('API Error:', error.response?.data || error.message);
+    if (error.response?.status === 401) {
+      // Auto-logout if token is expired or invalid
+      useAuthStore.getState().logout();
+      window.location.href = '/login';
+    }
     return Promise.reject(error);
   }
 );
