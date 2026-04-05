@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import SearchBar from '../components/SearchBar';
 import WordCard from '../components/WordCard';
+import { WordCardSkeleton } from '../components/Skeletons';
 import { publicApi } from '../api/publicApi';
+import useDebounce from '../hooks/useDebounce';
 
 export default function Search() {
   const [query, setQuery] = useState('');
@@ -10,27 +12,43 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
-  const handleSearch = async () => {
+  // Apply 400ms debounce
+  const debouncedQuery = useDebounce(query, 400);
+
+  const performSearch = useCallback(async (searchWord, semanticFlag) => {
+    if (!searchWord.trim()) {
+      setResults([]);
+      setSearched(false);
+      return;
+    }
+
     setLoading(true);
     setSearched(true);
     try {
-      // The backend expects searchWord(word, semantic) based on our Stage 2 mapping
-      const data = await publicApi.searchWord(query, isSemantic);
-      // Ensure results are always an array
+      const data = await publicApi.searchWord(searchWord, semanticFlag);
       setResults(Array.isArray(data) ? data : (data.results || [data]));
     } catch (error) {
-      console.error("Search failed");
+      console.error("Search failed", error);
       setResults([]);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Auto-search when debounced query or semantic toggle changes
+  useEffect(() => {
+    performSearch(debouncedQuery, isSemantic);
+  }, [debouncedQuery, isSemantic, performSearch]);
+
+  const handleManualSearch = () => {
+    performSearch(query, isSemantic);
   };
 
   return (
     <div className="max-w-4xl mx-auto py-8">
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-extrabold text-gray-900 mb-4">Discover Words</h1>
-        <p className="text-gray-500">Use standard or semantic search to find definitions, concepts, and ideas.</p>
+        <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white mb-4 transition-colors">Discover Words</h1>
+        <p className="text-gray-500 dark:text-gray-400">Use standard or semantic search to find definitions, concepts, and ideas.</p>
       </div>
 
       <SearchBar 
@@ -38,15 +56,20 @@ export default function Search() {
         setSearchQuery={setQuery}
         isSemantic={isSemantic}
         setIsSemantic={setIsSemantic}
-        onSearch={handleSearch}
+        onSearch={handleManualSearch}
       />
 
       <div className="mt-12 space-y-6">
-        {loading && <div className="text-center text-gray-500 animate-pulse">Searching the lexicon...</div>}
+        {loading && (
+          <div className="space-y-6">
+            <WordCardSkeleton />
+            <WordCardSkeleton />
+          </div>
+        )}
         
         {!loading && searched && results.length === 0 && (
-          <div className="text-center text-gray-500 py-12 bg-white rounded-xl border border-gray-100 shadow-sm">
-            No results found for "{query}". Try a different word or toggle semantic search.
+          <div className="text-center text-gray-500 py-12 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm animate-fade-in">
+            No results found for "{debouncedQuery}". Try a different word or toggle semantic search.
           </div>
         )}
 

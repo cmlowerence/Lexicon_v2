@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
+import { useUIStore } from '../store/uiStore';
 
 const BASE_URL = 'http://127.0.0.1:8000/api/v2/lexicon';
 
@@ -12,10 +13,8 @@ export const apiClient = axios.create({
   timeout: 10000,
 });
 
-// Inject Token into requests
 apiClient.interceptors.request.use(
   (config) => {
-    // Access Zustand store directly outside of React components
     const token = useAuthStore.getState().token;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -25,15 +24,22 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Global Error Handling (Catch 401 Unauthorized)
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Auto-logout if token is expired or invalid
+    const status = error.response?.status;
+    const { showToast } = useUIStore.getState();
+
+    if (status === 401) {
       useAuthStore.getState().logout();
       window.location.href = '/login';
+      showToast('Session expired. Please log in again.');
+    } else if (status >= 500) {
+      showToast('Server error. Please try again later.');
+    } else if (!error.response) {
+      showToast('Network error. Please check your connection.');
     }
+
     return Promise.reject(error);
   }
 );

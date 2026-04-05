@@ -4,6 +4,11 @@
 
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900 antialiased selection:bg-brand-100 selection:text-brand-900;
+    @apply bg-gray-50 text-gray-900 transition-colors duration-300 ease-in-out antialiased selection:bg-brand-200 selection:text-brand-900;
+  }
+
+  /* Dark mode global defaults */
+  .dark body {
+    @apply bg-slate-900 text-gray-100 selection:bg-brand-800 selection:text-white;
   }
 }
