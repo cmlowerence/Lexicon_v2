@@ -1,8 +1,9 @@
 import { lazy, Suspense } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import PublicLayout from '../layouts/PublicLayout';
 import AdminLayout from '../layouts/AdminLayout';
-import { AdminRoute } from './ProtectedRoute';
+import ProtectedRoute, { AdminRoute } from './ProtectedRoute';
+import { useAuthStore } from '../store/authStore';
 import { PageLoader } from '../components/Skeletons';
 import Toast from '../components/Toast';
 
@@ -17,19 +18,37 @@ const WordList = lazy(() => import('../pages/admin/WordList'));
 const WordEditor = lazy(() => import('../pages/admin/WordEditor'));
 const CategoryManager = lazy(() => import('../pages/admin/CategoryManager'));
 
+function LoginRoute() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isAdmin = useAuthStore((state) => state.isAdmin);
+  const location = useLocation();
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
+  const from = location.state?.from;
+  const defaultDestination = isAdmin ? '/admin' : '/';
+  const destination = typeof from === 'string' && from.startsWith('/') ? from : defaultDestination;
+
+  return <Navigate to={destination} replace />;
+}
+
 export default function AppRouter() {
   return (
     <>
       <Toast />
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={<LoginRoute />} />
 
-          <Route path="/" element={<PublicLayout />}>
-            <Route index element={<Home />} />
-            <Route path="search" element={<Search />} />
-            <Route path="practice" element={<Practice />} />
-            <Route path="*" element={<NotFound />} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<PublicLayout />}>
+              <Route index element={<Home />} />
+              <Route path="search" element={<Search />} />
+              <Route path="practice" element={<Practice />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
           </Route>
 
           <Route path="/admin" element={<AdminRoute />}>

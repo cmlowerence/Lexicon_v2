@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { authClient } from '../api/client';
 import { TOKEN_ENDPOINT } from '../config/api';
@@ -12,6 +12,7 @@ export default function Login() {
 
   const login = useAuthStore((state) => state.login);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -26,7 +27,11 @@ export default function Login() {
         refresh: response.data?.refresh ?? null,
       });
 
-      navigate('/admin');
+      const from = location.state?.from;
+      const fallback = '/';
+      const destination = typeof from === 'string' && from.startsWith('/') ? from : fallback;
+
+      navigate(destination, { replace: true });
     } catch (err) {
       setError(err?.response?.data?.detail || 'Invalid credentials. Please try again.');
     } finally {
