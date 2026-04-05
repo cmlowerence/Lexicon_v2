@@ -11,10 +11,24 @@ const normalizeBasePath = (basePath) => {
   return `/${normalizedPath}`;
 };
 
+const parseBoolean = (value, fallback = false) => {
+  if (typeof value !== 'string') return fallback;
+
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+
+  return fallback;
+};
+
 const RAW_API_ORIGIN = import.meta.env.VITE_API_ORIGIN;
 const RAW_LEXICON_BASE = import.meta.env.VITE_LEXICON_BASE;
+const RAW_AUTH_USE_COOKIE_REFRESH = import.meta.env.VITE_AUTH_USE_COOKIE_REFRESH;
 
 export const API_ROOT = normalizeOrigin(RAW_API_ORIGIN);
 export const LEXICON_BASE = `${API_ROOT}${normalizeBasePath(RAW_LEXICON_BASE)}`;
 export const TOKEN_ENDPOINT = `${API_ROOT}/api/token/`;
 export const TOKEN_REFRESH_ENDPOINT = `${API_ROOT}/api/token/refresh/`;
+
+// Default true: prefer HttpOnly cookie-based refresh sessions when backend supports it.
+export const AUTH_USE_COOKIE_REFRESH = parseBoolean(RAW_AUTH_USE_COOKIE_REFRESH, true);

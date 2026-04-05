@@ -1,10 +1,11 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 import { useUIStore } from '../store/uiStore';
-import { API_ROOT, LEXICON_BASE, TOKEN_REFRESH_ENDPOINT } from '../config/api';
+import { API_ROOT, AUTH_USE_COOKIE_REFRESH, LEXICON_BASE, TOKEN_REFRESH_ENDPOINT } from '../config/api';
 
 export const authClient = axios.create({
   baseURL: API_ROOT,
+  withCredentials: AUTH_USE_COOKIE_REFRESH,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -14,12 +15,23 @@ export const authClient = axios.create({
 
 export const apiClient = axios.create({
   baseURL: LEXICON_BASE,
+  withCredentials: AUTH_USE_COOKIE_REFRESH,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
   },
   timeout: 10000,
 });
+
+const redirectToLogin = () => {
+  window.location.href = '/login';
+};
+
+const handleAuthFailure = ({ forceLogout, showToast }) => {
+  forceLogout();
+  redirectToLogin();
+  showToast('Session expired. Please log in again.');
+};
 
 apiClient.interceptors.request.use(
   (config) => {
@@ -51,12 +63,10 @@ apiClient.interceptors.response.use(
     const { showToast } = useUIStore.getState();
 
     if (status === 401 && !originalRequest._retry) {
-      const { refreshToken, logout, setAccessToken } = useAuthStore.getState();
+      const { refreshToken, forceLogout, setAccessToken, setRefreshToken } = useAuthStore.getState();
 
-      if (!refreshToken) {
-        logout();
-        window.location.href = '/login';
-        showToast('Session expired. Please log in again.');
+      if (!AUTH_USE_COOKIE_REFRESH && !refreshToken) {
+        handleAuthFailure({ forceLogout, showToast });
         return Promise.reject(error);
       }
 
@@ -75,19 +85,27 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const response = await authClient.post(TOKEN_REFRESH_ENDPOINT, { refresh: refreshToken });
-        const newAccessToken = response.data.access;
+        const refreshPayload = AUTH_USE_COOKIE_REFRESH ? {} : { refresh: refreshToken };
+        const response = await authClient.post(TOKEN_REFRESH_ENDPOINT, refreshPayload);
+
+        const newAccessToken = response.data?.access;
+        if (!newAccessToken) {
+          throw new Error('Refresh response did not include a new access token.');
+        }
 
         setAccessToken(newAccessToken);
+
+        if (!AUTH_USE_COOKIE_REFRESH) {
+          setRefreshToken(response.data?.refresh ?? null);
+        }
+
         processQueue(null, newAccessToken);
 
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        logout();
-        window.location.href = '/login';
-        showToast('Session expired. Please log in again.');
+        handleAuthFailure({ forceLogout, showToast });
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
