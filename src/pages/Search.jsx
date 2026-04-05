@@ -12,7 +12,6 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
-  // Apply 400ms debounce
   const debouncedQuery = useDebounce(query, 400);
 
   const performSearch = useCallback(async (searchWord, semanticFlag) => {
@@ -25,24 +24,19 @@ export default function Search() {
     setLoading(true);
     setSearched(true);
     try {
-      const data = await publicApi.searchWord(searchWord, semanticFlag);
+      const data = await publicApi.searchWord(searchWord, semanticFlag, 'en');
       setResults(Array.isArray(data) ? data : (data.results || [data]));
     } catch (error) {
-      console.error("Search failed", error);
+      console.error('Search failed', error);
       setResults([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Auto-search when debounced query or semantic toggle changes
   useEffect(() => {
     performSearch(debouncedQuery, isSemantic);
   }, [debouncedQuery, isSemantic, performSearch]);
-
-  const handleManualSearch = () => {
-    performSearch(query, isSemantic);
-  };
 
   return (
     <div className="max-w-4xl mx-auto py-8">
@@ -51,12 +45,12 @@ export default function Search() {
         <p className="text-gray-500 dark:text-gray-400">Use standard or semantic search to find definitions, concepts, and ideas.</p>
       </div>
 
-      <SearchBar 
+      <SearchBar
         searchQuery={query}
         setSearchQuery={setQuery}
         isSemantic={isSemantic}
         setIsSemantic={setIsSemantic}
-        onSearch={handleManualSearch}
+        onSearch={() => performSearch(query, isSemantic)}
       />
 
       <div className="mt-12 space-y-6">
@@ -66,9 +60,9 @@ export default function Search() {
             <WordCardSkeleton />
           </div>
         )}
-        
+
         {!loading && searched && results.length === 0 && (
-          <div className="text-center text-gray-500 py-12 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm animate-fade-in">
+          <div className="text-center text-gray-500 dark:text-gray-300 py-12 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm animate-fade-in">
             No results found for "{debouncedQuery}". Try a different word or toggle semantic search.
           </div>
         )}

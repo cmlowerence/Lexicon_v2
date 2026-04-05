@@ -6,13 +6,12 @@ import ProtectedRoute from './ProtectedRoute';
 import { PageLoader } from '../components/Skeletons';
 import Toast from '../components/Toast';
 
-// Lazy Load Public Pages
 const Home = lazy(() => import('../pages/Home'));
 const Search = lazy(() => import('../pages/Search'));
 const Practice = lazy(() => import('../pages/Practice'));
 const Login = lazy(() => import('../pages/Login'));
+const NotFound = lazy(() => import('../pages/NotFound'));
 
-// Lazy Load Admin Pages
 const Dashboard = lazy(() => import('../pages/admin/Dashboard'));
 const WordList = lazy(() => import('../pages/admin/WordList'));
 const WordEditor = lazy(() => import('../pages/admin/WordEditor'));
@@ -30,6 +29,7 @@ export default function AppRouter() {
             <Route index element={<Home />} />
             <Route path="search" element={<Search />} />
             <Route path="practice" element={<Practice />} />
+            <Route path="*" element={<NotFound />} />
           </Route>
 
           <Route path="/admin" element={<ProtectedRoute />}>
@@ -39,8 +39,11 @@ export default function AppRouter() {
               <Route path="words/new" element={<WordEditor />} />
               <Route path="words/:id" element={<WordEditor />} />
               <Route path="categories" element={<CategoryManager />} />
+              <Route path="*" element={<NotFound />} />
             </Route>
           </Route>
+
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
     </>
