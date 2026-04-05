@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { PageLoader } from '../components/Skeletons';
 import { useAuthStore } from '../store/authStore';
 import { useUIStore } from '../store/uiStore';
 
@@ -9,7 +10,7 @@ export default function ProtectedRoute() {
   const location = useLocation();
 
   if (!hasHydrated) {
-    return null;
+    return <PageLoader />;
   }
 
   if (!isAuthenticated) {
@@ -36,7 +37,7 @@ export function AdminRoute() {
   }, [isAuthenticated, isAdmin, showToast]);
 
   if (!hasHydrated) {
-    return null;
+    return <PageLoader />;
   }
 
   if (!isAuthenticated) {
