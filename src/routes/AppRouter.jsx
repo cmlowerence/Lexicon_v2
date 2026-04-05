@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import PublicLayout from '../layouts/PublicLayout';
 import AdminLayout from '../layouts/AdminLayout';
-import ProtectedRoute from './ProtectedRoute';
+import { AdminRoute } from './ProtectedRoute';
 import { PageLoader } from '../components/Skeletons';
 import Toast from '../components/Toast';
 
@@ -32,7 +32,7 @@ export default function AppRouter() {
             <Route path="*" element={<NotFound />} />
           </Route>
 
-          <Route path="/admin" element={<ProtectedRoute />}>
+          <Route path="/admin" element={<AdminRoute />}>
             <Route element={<AdminLayout />}>
               <Route index element={<Dashboard />} />
               <Route path="words" element={<WordList />} />
