@@ -15,6 +15,22 @@ The React Compiler is not enabled on this template because of its impact on dev 
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
 
+
+## Base path configuration for subpath deployments
+
+Set `VITE_APP_BASE` to the public base path when deploying under a subpath.
+
+- Root deployment (default): leave `VITE_APP_BASE` unset, and Vite uses `/`.
+- Subpath deployment example: set `VITE_APP_BASE=/lexicon/` before running `npm run build`.
+
+Example:
+
+```bash
+VITE_APP_BASE=/lexicon/ npm run build
+```
+
+Use leading and trailing slashes for subpaths (for example `/lexicon/`) so generated asset URLs resolve correctly.
+
 ## Authentication security model
 
 The frontend uses a split-token strategy to reduce risk if browser storage is compromised:
