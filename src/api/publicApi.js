@@ -2,13 +2,14 @@ import { apiClient } from './client';
 import { transformDailyPractice, transformWOTD, transformWord, transformWordList } from './transformers/wordTransformer';
 
 export const publicApi = {
-  searchWord: async (word, semantic = false, lang = 'en') => {
+  searchWord: async (word, semantic = false, lang = 'en', requestOptions = {}) => {
     const response = await apiClient.get('/public/search/', {
       params: {
         word,
         lang,
         semantic: semantic ? 'true' : 'false',
       },
+      ...requestOptions,
     });
 
     const payload = response.data;

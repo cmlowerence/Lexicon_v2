@@ -31,7 +31,12 @@ describe('Search Page', () => {
 
     // Wait for results
     await waitFor(() => {
-      expect(publicApi.searchWord).toHaveBeenCalledWith('resilience', false);
+      expect(publicApi.searchWord).toHaveBeenCalledWith(
+        'resilience',
+        false,
+        'en',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
       expect(screen.getByText('resilience')).toBeInTheDocument();
     });
   });
@@ -50,7 +55,23 @@ describe('Search Page', () => {
     
     // Wait for the 400ms debounce to trigger the auto-search
     await waitFor(() => {
-      expect(publicApi.searchWord).toHaveBeenCalledWith('happy', true);
+      expect(publicApi.searchWord).toHaveBeenCalledWith(
+        'happy',
+        true,
+        'en',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
     }, { timeout: 1000 });
+  });
+
+  it('does not search for one-character input', async () => {
+    render(<Search />);
+
+    const input = screen.getByPlaceholderText(/Search for a word/i);
+    await userEvent.type(input, 'a');
+
+    await waitFor(() => {
+      expect(publicApi.searchWord).not.toHaveBeenCalled();
+    }, { timeout: 700 });
   });
 });
