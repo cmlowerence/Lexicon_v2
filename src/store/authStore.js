@@ -9,6 +9,11 @@ const initialState = {
   refreshToken: null,
   hasRefreshSession: false,
   isAuthenticated: false,
+  role: null,
+  isStaff: false,
+  isSuperuser: false,
+  claims: {},
+  isAdmin: false,
 };
 
 const ADMIN_ROLES = new Set(['admin', 'administrator', 'superadmin', 'staff']);
@@ -66,20 +71,28 @@ export const useAuthStore = create(
       login: ({ access, refresh }) => {
         const normalizedRefreshToken = refresh ?? null;
         const hasRefreshSession = AUTH_USE_COOKIE_REFRESH || Boolean(normalizedRefreshToken);
+        const authClaims = extractUserClaims({ accessToken: access ?? null });
 
         set({
           accessToken: access ?? null,
           refreshToken: normalizedRefreshToken,
           hasRefreshSession,
           isAuthenticated: Boolean(access) || hasRefreshSession,
+          ...authClaims,
         });
       },
 
       setAccessToken: (accessToken) =>
-        set((state) => ({
-          accessToken: accessToken ?? null,
-          isAuthenticated: Boolean(accessToken) || state.hasRefreshSession,
-        })),
+        set((state) => {
+          const normalizedAccessToken = accessToken ?? null;
+          const authClaims = extractUserClaims({ accessToken: normalizedAccessToken });
+
+          return {
+            accessToken: normalizedAccessToken,
+            isAuthenticated: Boolean(normalizedAccessToken) || state.hasRefreshSession,
+            ...authClaims,
+          };
+        }),
 
       setRefreshToken: (refreshToken) =>
         set((state) => {
