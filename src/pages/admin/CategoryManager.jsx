@@ -1,48 +1,44 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { adminApi } from '../../api/adminApi';
+import QueryBoundary from '../../components/QueryBoundary';
+import { useAdminCategoriesQuery } from '../../hooks/useLexiconQueries';
+import { invalidateQuery } from '../../lib/queryClient';
 import { Trash2, Plus } from 'lucide-react';
 
 export default function CategoryManager() {
-  const [categories, setCategories] = useState([]);
   const [newCatName, setNewCatName] = useState('');
 
-  const loadCategories = async () => {
-    try {
-      const data = await adminApi.getCategories();
-      setCategories(data || []);
-    } catch (error) {
-      console.error("Failed to load categories");
-    }
-  };
-
-  useEffect(() => { loadCategories(); }, []);
+  const {
+    data: categories = [],
+    isLoading,
+    isError,
+    error,
+    isFetching,
+    refetch,
+  } = useAdminCategoriesQuery();
 
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!newCatName.trim()) return;
-    try {
-      await adminApi.createCategory({ name: newCatName });
-      setNewCatName('');
-      loadCategories();
-    } catch (error) {
-      console.error("Failed to create category");
-    }
+
+    await adminApi.createCategory({ name: newCatName.trim() });
+    setNewCatName('');
+    invalidateQuery(['admin', 'categories']);
+    await refetch();
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this category?")) return;
-    try {
-      await adminApi.deleteCategory(id);
-      loadCategories();
-    } catch (error) {
-      console.error("Failed to delete category");
-    }
+    if (!window.confirm('Are you sure you want to delete this category?')) return;
+
+    await adminApi.deleteCategory(id);
+    invalidateQuery(['admin', 'categories']);
+    await refetch();
   };
 
   return (
     <div className="space-y-6 max-w-3xl">
       <h1 className="text-2xl font-bold text-gray-900">Category Manager</h1>
-      
+
       <form onSubmit={handleCreate} className="flex gap-2">
         <input
           type="text"
@@ -56,33 +52,43 @@ export default function CategoryManager() {
         </button>
       </form>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-sm font-medium text-gray-500">Name</th>
-              <th className="px-6 py-3 text-sm font-medium text-gray-500 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {categories.map((cat) => (
-              <tr key={cat.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 font-medium text-gray-900">{cat.name}</td>
-                <td className="px-6 py-4 text-right">
-                  <button onClick={() => handleDelete(cat.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors">
-                    <Trash2 size={20} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {categories.length === 0 && (
+      {isFetching && <p className="text-xs text-gray-500">Refreshing categories…</p>}
+
+      <QueryBoundary
+        isLoading={isLoading}
+        isError={isError}
+        error={error}
+        onRetry={refetch}
+        loadingFallback={<div className="text-center py-6 text-gray-500">Loading categories...</div>}
+      >
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <td colSpan="2" className="px-6 py-4 text-center text-gray-500">No categories found.</td>
+                <th className="px-6 py-3 text-sm font-medium text-gray-500">Name</th>
+                <th className="px-6 py-3 text-sm font-medium text-gray-500 text-right">Actions</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {categories.map((cat) => (
+                <tr key={cat.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 font-medium text-gray-900">{cat.name}</td>
+                  <td className="px-6 py-4 text-right">
+                    <button onClick={() => handleDelete(cat.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors">
+                      <Trash2 size={20} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {categories.length === 0 && (
+                <tr>
+                  <td colSpan="2" className="px-6 py-4 text-center text-gray-500">No categories found.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </QueryBoundary>
     </div>
   );
 }
