@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import PublicLayout from '../layouts/PublicLayout';
 import AdminLayout from '../layouts/AdminLayout';
 import ProtectedRoute, { AdminRoute } from './ProtectedRoute';
@@ -27,7 +27,9 @@ function LoginRoute() {
     return <Login />;
   }
 
-  const from = location.state?.from;
+  const fromFromState = location.state?.from;
+  const fromFromQuery = new URLSearchParams(location.search).get('from');
+  const from = fromFromState ?? fromFromQuery;
   const defaultDestination = isAdmin ? '/admin' : '/';
   const destination = typeof from === 'string' && from.startsWith('/') ? from : defaultDestination;
 
@@ -35,6 +37,31 @@ function LoginRoute() {
 }
 
 export default function AppRouter() {
+  const navigate = useNavigate();
+  const authExpiryRedirect = useAuthStore((state) => state.authExpiryRedirect);
+  const clearAuthExpiryRedirect = useAuthStore((state) => state.clearAuthExpiryRedirect);
+
+  useEffect(() => {
+    if (!authExpiryRedirect) {
+      return;
+    }
+
+    navigate('/login', { replace: true, state: { from: authExpiryRedirect } });
+    clearAuthExpiryRedirect();
+  }, [authExpiryRedirect, clearAuthExpiryRedirect, navigate]);
+
+  useEffect(() => {
+    const handleAuthExpired = (event) => {
+      const from = event?.detail?.from;
+      const normalizedFrom = typeof from === 'string' && from.startsWith('/') ? from : '/';
+      navigate('/login', { replace: true, state: { from: normalizedFrom } });
+      clearAuthExpiryRedirect();
+    };
+
+    window.addEventListener('lexicon:auth-expired', handleAuthExpired);
+    return () => window.removeEventListener('lexicon:auth-expired', handleAuthExpired);
+  }, [clearAuthExpiryRedirect, navigate]);
+
   return (
     <>
       <Toast />

@@ -15,6 +15,7 @@ const initialState = {
   claims: {},
   isAdmin: false,
   hasHydrated: false,
+  authExpiryRedirect: null,
 };
 
 const ADMIN_ROLES = new Set(['admin', 'administrator', 'superadmin', 'staff']);
@@ -174,6 +175,15 @@ export const useAuthStore = create(
       logout: () => {
         set({ ...initialState });
         useAuthStore.persist.clearStorage();
+      },
+
+      markAuthExpired: (fromPath) => {
+        const normalizedFromPath = typeof fromPath === 'string' && fromPath.startsWith('/') ? fromPath : '/';
+        set({ authExpiryRedirect: normalizedFromPath });
+      },
+
+      clearAuthExpiryRedirect: () => {
+        set({ authExpiryRedirect: null });
       },
     }),
     {
