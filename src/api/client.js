@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 import { useUIStore } from '../store/uiStore';
 
-const BASE_URL = 'http://127.0.0.1:8000/api/v2/lexicon';
+const BASE_URL = 'https://qubitgyan-api.onrender.com/api/v2/lexicon';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
