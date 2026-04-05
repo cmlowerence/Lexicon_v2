@@ -4,37 +4,36 @@ import AdminLayout from '../layouts/AdminLayout';
 import ProtectedRoute from './ProtectedRoute';
 import Login from '../pages/Login';
 
-// Import New Public Pages
+
 import Home from '../pages/Home';
 import Search from '../pages/Search';
 import Practice from '../pages/Practice';
 
-// Temporary Placeholders for Stage 5
-const Placeholder = ({ title }) => (
-  <div className="flex items-center justify-center h-64 bg-white rounded-xl border border-gray-200 shadow-sm">
-    <h2 className="text-xl font-medium text-gray-500">{title} Component (Pending Next Stage)</h2>
-  </div>
-);
+
+import Dashboard from '../pages/admin/Dashboard';
+import WordList from '../pages/admin/WordList';
+import WordEditor from '../pages/admin/WordEditor';
+import CategoryManager from '../pages/admin/CategoryManager';
 
 export default function AppRouter() {
   return (
     <Routes>
-      {/* Auth Route */}
       <Route path="/login" element={<Login />} />
 
-      {/* Public Routes (No Auth Required) */}
       <Route path="/" element={<PublicLayout />}>
         <Route index element={<Home />} />
         <Route path="search" element={<Search />} />
         <Route path="practice" element={<Practice />} />
       </Route>
 
-      {/* Admin Routes (Auth Required) */}
       <Route path="/admin" element={<ProtectedRoute />}>
         <Route element={<AdminLayout />}>
-          <Route index element={<Placeholder title="Admin Dashboard" />} />
-          <Route path="words" element={<Placeholder title="Word Manager" />} />
-          <Route path="categories" element={<Placeholder title="Category Manager" />} />
+          <Route index element={<Dashboard />} />
+          <Route path="words" element={<WordList />} />
+          {/* WordEditor handles both Create and Edit based on param */}
+          <Route path="words/new" element={<WordEditor />} />
+          <Route path="words/:id" element={<WordEditor />} />
+          <Route path="categories" element={<CategoryManager />} />
         </Route>
       </Route>
     </Routes>
